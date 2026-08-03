@@ -28,17 +28,24 @@ export interface CliContext {
   log: (message: string) => void;
 }
 
+function getWriteHeaders(): Record<string, string> {
+  const secret = process.env.DFS_WRITE_SECRET;
+  return secret ? { "x-dfs-write-secret": secret } : {};
+}
+
 export async function uploadFile(ctx: CliContext, filePath: string): Promise<FileRecord> {
   const absolutePath = resolve(filePath);
   const info = await stat(absolutePath);
   const chunkCount = getChunkCount(info.size);
+
+  const headers = getWriteHeaders();
 
   ctx.log(`Chunking ${absolutePath} (${info.size} bytes -> ${chunkCount} chunks)...`);
   const file = await postJson<FileRecord>(ctx.metadataUrl, "/files", {
     name: basename(absolutePath),
     size: info.size,
     chunkCount
-  });
+  }, headers);
 
   for await (const chunk of readFileChunks(absolutePath)) {
     ctx.log(`Uploading chunk ${chunk.chunkIndex + 1}/${chunkCount}...`);
@@ -46,14 +53,15 @@ export async function uploadFile(ctx: CliContext, filePath: string): Promise<Fil
       chunkIndex: chunk.chunkIndex,
       checksum: chunk.checksum,
       size: chunk.size
-    });
+    }, headers);
 
     const successfulReplicas = [];
     const attempts = await Promise.allSettled(
       plan.targets.map(async (target) => {
         await putBytes(target.address, `/chunks/${plan.chunkId}`, chunk.bytes, {
           "content-type": "application/octet-stream",
-          "x-checksum": chunk.checksum
+          "x-checksum": chunk.checksum,
+          ...headers
         });
         return target;
       })
@@ -70,7 +78,7 @@ export async function uploadFile(ctx: CliContext, filePath: string): Promise<Fil
       checksum: chunk.checksum,
       size: chunk.size,
       replicas: committedReplicas
-    });
+    }, headers);
 
     ctx.log(
       `Chunk ${chunk.chunkIndex + 1}/${chunkCount} committed (${committedReplicas
@@ -79,7 +87,7 @@ export async function uploadFile(ctx: CliContext, filePath: string): Promise<Fil
     );
   }
 
-  const completeFile = await postJson<FileRecord>(ctx.metadataUrl, `/files/${file.id}/complete`, {});
+  const completeFile = await postJson<FileRecord>(ctx.metadataUrl, `/files/${file.id}/complete`, {}, headers);
   ctx.log(`Upload complete. file_id: ${completeFile.id}`);
   return completeFile;
 }
@@ -154,14 +162,28 @@ export async function killNode(nodeId: string): Promise<void> {
 
 export async function watchHealing(ctx: CliContext, timeoutMs = 120_000): Promise<void> {
   const startedAt = Date.now();
+  ctx.log("Waiting for metadata to mark node dead...");
+  let failureObserved = false;
+
   while (Date.now() - startedAt < timeoutMs) {
     const metrics = await getJson<ClusterMetrics>(ctx.metadataUrl, "/metrics");
-    ctx.log(
-      `healthy=${metrics.healthyNodes} dead=${metrics.deadNodes} under_replicated=${metrics.underReplicatedChunks}`
-    );
 
-    if (metrics.underReplicatedChunks === 0) {
-      return;
+    if (!failureObserved) {
+      if (metrics.deadNodes > 0 || metrics.underReplicatedChunks > 0) {
+        failureObserved = true;
+        ctx.log(
+          `Failure detected: dead=${metrics.deadNodes} under_replicated=${metrics.underReplicatedChunks}`
+        );
+        ctx.log("Waiting for repair to restore RF=3...");
+      }
+    } else {
+      ctx.log(
+        `healthy=${metrics.healthyNodes} dead=${metrics.deadNodes} under_replicated=${metrics.underReplicatedChunks}`
+      );
+      if (metrics.underReplicatedChunks === 0 && metrics.healthyNodes >= 3) {
+        ctx.log("Repair complete: under_replicated=0");
+        return;
+      }
     }
 
     await new Promise((resolveDelay) => setTimeout(resolveDelay, 5_000));

@@ -9,8 +9,25 @@ export interface MetadataConfig {
   host: string;
 }
 
+class RateLimiter {
+  private requests = new Map<string, number[]>();
+
+  isRateLimited(ip: string, windowMs: number, maxRequests: number): boolean {
+    const now = Date.now();
+    const windowStart = now - windowMs;
+    const timestamps = (this.requests.get(ip) ?? []).filter((t) => t > windowStart);
+    if (timestamps.length >= maxRequests) {
+      return true;
+    }
+    timestamps.push(now);
+    this.requests.set(ip, timestamps);
+    return false;
+  }
+}
+
 export function createMetadataServer(db: MetadataDb) {
   const server = Fastify({ logger: true });
+  const writeRateLimiter = new RateLimiter();
 
   server.register(cors, {
     origin: true,
@@ -19,6 +36,32 @@ export function createMetadataServer(db: MetadataDb) {
 
   server.addContentTypeParser("application/octet-stream", { parseAs: "buffer" }, (_request, body, done) => {
     done(null, body);
+  });
+
+  server.addHook("onRequest", async (request, reply) => {
+    const method = request.method.toUpperCase();
+    const url = request.url;
+
+    const isClientWrite =
+      (method === "POST" && url.startsWith("/files")) ||
+      (method === "PUT" && url.startsWith("/gateway/"));
+
+    if (isClientWrite) {
+      // 1. Shared Secret Check
+      const secret = process.env.DFS_WRITE_SECRET;
+      if (secret) {
+        const headerSecret = request.headers["x-dfs-write-secret"];
+        if (headerSecret !== secret) {
+          return reply.status(401).send({ error: "Unauthorized: Invalid or missing X-DFS-Write-Secret header" });
+        }
+      }
+
+      // 2. Targeted Rate Limiting for Writes (30 requests per minute per IP)
+      const ip = request.ip || "127.0.0.1";
+      if (writeRateLimiter.isRateLimited(ip, 60_000, 30)) {
+        return reply.status(429).send({ error: "Too many write requests, please try again later" });
+      }
+    }
   });
 
   server.post<{ Body: { id: string; address: string } }>("/nodes/register", async (request, reply) => {

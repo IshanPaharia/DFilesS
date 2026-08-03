@@ -51,4 +51,33 @@ Every deviation from the PRD or implementation plan must be recorded here with d
 - Rationale: Avoids adding an external network dependency to the control-plane's hot path.
 - Impact: Metadata operations retain low latency and zero external dependency risk during local and VPS deployment.
 
+## 2026-08-03: Strict Gateway Routing for Web Clients
+
+- Context: Browser clients on external networks (e.g. Vercel) cannot access private Docker container IP addresses (`http://storage-node-N:7001`).
+- Decision: Standardize `apps/dfs-web` chunk uploads and downloads exclusively through `metadata-service` gateway endpoints (`/gateway/nodes/:nodeId/chunks/:chunkId`).
+- Rationale: Isolates storage node network addresses as internal implementation details and eliminates CORS/mixed-content issues.
+- Impact: Storage nodes remain securely tucked inside the private Docker network; web applications communicate only with the public metadata/gateway origin.
+
+## 2026-08-03: Shared Secret Write Protection & Targeted Rate Limiting
+
+- Context: Protecting live demo deployments against write abuse without obscuring or locking the presentation dashboard behind a full passkey login gate.
+- Decision: Implement write-route shared secret checking (`X-DFS-Write-Secret` header against `DFS_WRITE_SECRET`) paired with targeted rate limiting (30 req/min for write routes), while leaving read and metrics polling routes (`/metrics`, `/nodes`, `/files`) fully public and unthrottled.
+- Rationale: Preserves the core goal of deploying a public demo (showing cluster health, file listings, and downloads) while preventing unauthorized write/storage resource abuse.
+- Impact: Visitors can explore the dashboard and download files immediately; authorized uploaders can enter the secret on the upload tab or pass it via CLI env var.
+
+## 2026-08-03: Caddy + DuckDNS HTTPS Reverse Proxy & Oracle Firewall Setup
+
+- Context: Web browsers require HTTPS endpoints when fetching from HTTPS origins (Vercel). Oracle Cloud blocks ports 80 and 443 by default at both VCN and OS iptables levels.
+- Decision: Deploy Caddy reverse proxy using a free DuckDNS domain (`dfiless.duckdns.org`) for automatic Let's Encrypt TLS termination, and explicitly document opening VCN ingress rules and instance OS iptables/ufw rules.
+- Rationale: Caddy provides zero-config automatic HTTPS, while explicit firewall documentation prevents ACME challenge timeouts during initial VPS setup.
+- Impact: Live demo endpoints are securely served over HTTPS without custom certificate management overhead.
+
+## 2026-08-03: Two-Phase `heal-watch` Failure & Repair Verification
+
+- Context: `docker kill storage-node-3` requires ~15 seconds for heartbeat missed thresholds to mark the node dead in metadata. Premature `watchHealing` checks could exit immediately if run before node death was registered.
+- Decision: Refactor CLI `watchHealing` to run in two explicit phases: Phase 1 waits until failure/under-replication is observed, and Phase 2 waits until repair completes (under-replicated chunks = 0 and RF=3 restored).
+- Rationale: Ensures deterministic and reliable failure-demo verification logs during automated and manual testing.
+- Impact: `heal-watch` reliably tracks and logs the complete failure detection and self-healing lifecycle.
+
+
 

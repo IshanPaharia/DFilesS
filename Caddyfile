@@ -1,0 +1,7 @@
+# Sample Caddyfile for Oracle VPS HTTPS Reverse Proxy
+# Replace dfiless.duckdns.org with your free DuckDNS domain or personal domain.
+
+dfiless.duckdns.org {
+    # Terminate TLS via Let's Encrypt / ACME automatically (requires ports 80 and 443 open)
+    reverse_proxy metadata-service:4000
+}

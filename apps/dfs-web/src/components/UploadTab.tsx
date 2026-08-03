@@ -1,10 +1,10 @@
 import React, { useState } from "react";
-import { UploadCloud, File, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
+import { UploadCloud, File, CheckCircle, AlertCircle, Loader2, Key } from "lucide-react";
 import { Button } from "./ui/Button";
 import { Chip } from "./ui/Chip";
 import { Alert } from "./ui/Alert";
 import { calculateSha256 } from "../utils/crypto";
-import { commitChunk, createFile, completeFile, planChunk, uploadChunkPayload } from "../api/client";
+import { commitChunk, createFile, completeFile, planChunk, uploadChunkPayload, getWriteSecret, setWriteSecret } from "../api/client";
 
 const CHUNK_SIZE = 4 * 1024 * 1024; // 4 MB
 
@@ -24,6 +24,13 @@ export const UploadTab: React.FC<UploadTabProps> = ({ onUploadSuccess }) => {
   const [isUploading, setIsUploading] = useState(false);
   const [chunksStatus, setChunksStatus] = useState<ChunkStatus[]>([]);
   const [alert, setAlert] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [writeSecret, setWriteSecretInput] = useState(getWriteSecret());
+
+  const handleSecretChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setWriteSecretInput(val);
+    setWriteSecret(val);
+  };
 
   const formatBytes = (bytes: number): string => {
     if (bytes < 1024) return `${bytes} B`;
@@ -136,6 +143,25 @@ export const UploadTab: React.FC<UploadTabProps> = ({ onUploadSuccess }) => {
           {alert.message}
         </Alert>
       )}
+
+      {/* Optional Write Secret Card */}
+      <div className="bg-white border border-[#DAD7D0] rounded-xl p-4 flex items-center gap-3 shadow-xs">
+        <Key className="w-5 h-5 text-[#1E4B49] flex-shrink-0" />
+        <div className="flex-1">
+          <label htmlFor="write-secret-input" className="block text-xs font-semibold text-[#4A4A4A] mb-1">
+            Write Secret (Required if gateway write-protection is enabled)
+          </label>
+          <input
+            id="write-secret-input"
+            type="password"
+            placeholder="Enter write secret (leave blank if public)"
+            value={writeSecret}
+            onChange={handleSecretChange}
+            disabled={isUploading}
+            className="w-full px-3 py-1.5 text-xs rounded-lg border border-[#DAD7D0] focus:outline-none focus:border-[#1E4B49] bg-[#F7F5F0]"
+          />
+        </div>
+      </div>
 
       {/* File Dropzone / Picker */}
       <div className="bg-white border-2 border-dashed border-[#DAD7D0] rounded-xl p-8 text-center hover:border-[#1E4B49] transition-colors">

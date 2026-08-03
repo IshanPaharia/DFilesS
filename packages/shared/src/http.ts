@@ -17,10 +17,15 @@ export async function getJson<T>(baseUrl: string, path: string): Promise<T> {
   return parseJsonResponse<T>(response);
 }
 
-export async function postJson<T>(baseUrl: string, path: string, body: unknown): Promise<T> {
+export async function postJson<T>(
+  baseUrl: string,
+  path: string,
+  body: unknown,
+  headers?: Record<string, string>
+): Promise<T> {
   const response = await fetch(joinUrl(baseUrl, path), {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", ...headers },
     body: JSON.stringify(body)
   });
   return parseJsonResponse<T>(response);

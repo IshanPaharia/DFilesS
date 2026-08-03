@@ -25,11 +25,26 @@ services:
     environment:
       DATABASE_URL: postgres://dfs:dfs@postgres:5432/dfs
       PORT: 4000
+      DFS_WRITE_SECRET: ${DFS_WRITE_SECRET:-}
     ports:
       - "4000:4000"
     depends_on:
       postgres:
         condition: service_healthy
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - metadata-service
 
   storage-node-1:
     build:
@@ -115,3 +130,7 @@ services:
       - storage-node-2
       - storage-node-3
       - storage-node-4
+
+volumes:
+  caddy_data:
+  caddy_config:

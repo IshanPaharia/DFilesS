@@ -9,6 +9,26 @@ import type {
 
 export const METADATA_BASE_URL = (import.meta.env.VITE_METADATA_URL as string | undefined) ?? "/api";
 
+let writeSecretState = localStorage.getItem("dfs_write_secret") ?? "";
+
+export function setWriteSecret(secret: string): void {
+  writeSecretState = secret;
+  if (secret) {
+    localStorage.setItem("dfs_write_secret", secret);
+  } else {
+    localStorage.removeItem("dfs_write_secret");
+  }
+}
+
+export function getWriteSecret(): string {
+  return writeSecretState;
+}
+
+function getWriteHeaders(): Record<string, string> {
+  const secret = getWriteSecret();
+  return secret ? { "x-dfs-write-secret": secret } : {};
+}
+
 export async function fetchFiles(): Promise<FileRecord[]> {
   const res = await fetch(`${METADATA_BASE_URL}/files`);
   if (!res.ok) {
@@ -38,12 +58,15 @@ export async function fetchMetrics(): Promise<ClusterMetrics> {
 export async function createFile(name: string, size: number, chunkCount: number): Promise<FileRecord> {
   const res = await fetch(`${METADATA_BASE_URL}/files`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: {
+      "content-type": "application/json",
+      ...getWriteHeaders()
+    },
     body: JSON.stringify({ name, size, chunkCount })
   });
   if (!res.ok) {
     const errText = await res.text();
-    throw new Error(`Failed to create file: ${errText}`);
+    throw new Error(`Failed to create file (${res.status}): ${errText}`);
   }
   return res.json();
 }
@@ -56,55 +79,41 @@ export async function planChunk(
 ): Promise<ChunkPlanResponse> {
   const res = await fetch(`${METADATA_BASE_URL}/files/${fileId}/chunks/plan`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: {
+      "content-type": "application/json",
+      ...getWriteHeaders()
+    },
     body: JSON.stringify({ chunkIndex, checksum, size })
   });
   if (!res.ok) {
     const errText = await res.text();
-    throw new Error(`Failed to plan chunk ${chunkIndex}: ${errText}`);
+    throw new Error(`Failed to plan chunk ${chunkIndex} (${res.status}): ${errText}`);
   }
   return res.json();
 }
 
 export async function uploadChunkPayload(
   targetNodeId: string,
-  targetAddress: string,
+  _targetAddress: string,
   chunkId: string,
   bytes: ArrayBuffer,
   checksum: string
 ): Promise<void> {
-  // Try direct node upload first
-  try {
-    const url = `${targetAddress.replace(/\/$/, "")}/chunks/${chunkId}`;
-    const directRes = await fetch(url, {
-      method: "PUT",
-      headers: {
-        "content-type": "application/octet-stream",
-        "x-checksum": checksum
-      },
-      body: bytes
-    });
-    if (directRes.ok) {
-      return;
-    }
-  } catch {
-    // Network or CORS error reaching direct storage address; fallback to gateway proxy
-  }
-
-  // Gateway proxy fallback
+  // Always route upload through metadata-service gateway
   const gatewayUrl = `${METADATA_BASE_URL}/gateway/nodes/${targetNodeId}/chunks/${chunkId}`;
   const gatewayRes = await fetch(gatewayUrl, {
     method: "PUT",
     headers: {
       "content-type": "application/octet-stream",
-      "x-checksum": checksum
+      "x-checksum": checksum,
+      ...getWriteHeaders()
     },
     body: bytes
   });
 
   if (!gatewayRes.ok) {
     const text = await gatewayRes.text();
-    throw new Error(`Upload chunk ${chunkId} to node ${targetNodeId} failed: ${text}`);
+    throw new Error(`Upload chunk ${chunkId} to node ${targetNodeId} failed (${gatewayRes.status}): ${text}`);
   }
 }
 
@@ -117,23 +126,29 @@ export async function commitChunk(
 ): Promise<DownloadChunk> {
   const res = await fetch(`${METADATA_BASE_URL}/files/${fileId}/chunks/${chunkIndex}/commit`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: {
+      "content-type": "application/json",
+      ...getWriteHeaders()
+    },
     body: JSON.stringify({ checksum, size, replicas })
   });
   if (!res.ok) {
     const errText = await res.text();
-    throw new Error(`Failed to commit chunk ${chunkIndex}: ${errText}`);
+    throw new Error(`Failed to commit chunk ${chunkIndex} (${res.status}): ${errText}`);
   }
   return res.json();
 }
 
 export async function completeFile(fileId: string): Promise<FileRecord> {
   const res = await fetch(`${METADATA_BASE_URL}/files/${fileId}/complete`, {
-    method: "POST"
+    method: "POST",
+    headers: {
+      ...getWriteHeaders()
+    }
   });
   if (!res.ok) {
     const errText = await res.text();
-    throw new Error(`Failed to complete file: ${errText}`);
+    throw new Error(`Failed to complete file (${res.status}): ${errText}`);
   }
   return res.json();
 }
@@ -148,23 +163,10 @@ export async function getFileChunks(fileId: string): Promise<FileChunksResponse>
 
 export async function downloadChunkPayload(
   nodeId: string,
-  address: string,
+  _address: string,
   chunkId: string
 ): Promise<{ buffer: ArrayBuffer; checksum: string | null }> {
-  // Try direct fetch first
-  try {
-    const url = `${address.replace(/\/$/, "")}/chunks/${chunkId}`;
-    const res = await fetch(url);
-    if (res.ok) {
-      const checksum = res.headers.get("x-checksum");
-      const buffer = await res.arrayBuffer();
-      return { buffer, checksum };
-    }
-  } catch {
-    // Direct reach failed, fallback to gateway proxy
-  }
-
-  // Gateway proxy fallback
+  // Always route download through metadata-service gateway
   const gatewayUrl = `${METADATA_BASE_URL}/gateway/nodes/${nodeId}/chunks/${chunkId}`;
   const res = await fetch(gatewayUrl);
   if (!res.ok) {
