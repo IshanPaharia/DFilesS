@@ -76,7 +76,7 @@ export const UploadTab: React.FC<UploadTabProps> = ({ onUploadSuccess }) => {
 
         // Upload to targets
         const successfulReplicas: Array<{ nodeId: string; address: string }> = [];
-        const uploadPromises = plan.targets.map(async (target) => {
+        const uploadPromises = plan.targets.map(async (target: { nodeId: string; address: string }) => {
           await uploadChunkPayload(target.nodeId, target.address, plan.chunkId, buffer, checksum);
           return target;
         });
