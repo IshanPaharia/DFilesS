@@ -9,7 +9,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      - /var/lib/dfs/postgres:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U dfs -d dfs"]
       interval: 5s
@@ -44,7 +44,7 @@ services:
       ADVERTISED_ADDRESS: http://storage-node-1:7001
       DATA_DIR: /data
     volumes:
-      - storage-node-1-data:/data
+      - /var/lib/dfs/storage-node-1:/data
     depends_on:
       - metadata-service
 
@@ -61,7 +61,7 @@ services:
       ADVERTISED_ADDRESS: http://storage-node-2:7001
       DATA_DIR: /data
     volumes:
-      - storage-node-2-data:/data
+      - /var/lib/dfs/storage-node-2:/data
     depends_on:
       - metadata-service
 
@@ -78,7 +78,7 @@ services:
       ADVERTISED_ADDRESS: http://storage-node-3:7001
       DATA_DIR: /data
     volumes:
-      - storage-node-3-data:/data
+      - /var/lib/dfs/storage-node-3:/data
     depends_on:
       - metadata-service
 
@@ -95,7 +95,7 @@ services:
       ADVERTISED_ADDRESS: http://storage-node-4:7001
       DATA_DIR: /data
     volumes:
-      - storage-node-4-data:/data
+      - /var/lib/dfs/storage-node-4:/data
     depends_on:
       - metadata-service
 
@@ -115,10 +115,3 @@ services:
       - storage-node-2
       - storage-node-3
       - storage-node-4
-
-volumes:
-  postgres-data:
-  storage-node-1-data:
-  storage-node-2-data:
-  storage-node-3-data:
-  storage-node-4-data:

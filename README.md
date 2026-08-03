@@ -19,7 +19,10 @@ Default local cluster:
 
 ## Quick Start
 
+Ensure host bind mount directories (`/var/lib/dfs/...`) are created before starting containers:
+
 ```bash
+sudo ./scripts/setup-host-dirs.sh
 corepack pnpm install
 corepack pnpm build
 docker compose up --build

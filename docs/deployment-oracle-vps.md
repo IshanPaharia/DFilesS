@@ -31,6 +31,27 @@ The Compose file provides local defaults:
 - `METADATA_URL=http://metadata-service:4000`
 - `ADVERTISED_ADDRESS=http://storage-node-N:7001`
 
+## Host Storage Setup
+
+Before starting the containers, create the required host directories under `/var/lib/dfs` with correct ownership (`70:70` for Postgres, `0:0` for storage nodes):
+
+```bash
+sudo ./scripts/setup-host-dirs.sh
+```
+
+Or manually:
+
+```bash
+sudo mkdir -p /var/lib/dfs/postgres \
+              /var/lib/dfs/storage-node-1 \
+              /var/lib/dfs/storage-node-2 \
+              /var/lib/dfs/storage-node-3 \
+              /var/lib/dfs/storage-node-4
+sudo chown -R 70:70 /var/lib/dfs/postgres
+sudo chown -R 0:0 /var/lib/dfs/storage-node-1 /var/lib/dfs/storage-node-2 /var/lib/dfs/storage-node-3 /var/lib/dfs/storage-node-4
+sudo chmod 755 /var/lib/dfs/*
+```
+
 ## Deploy
 
 ```bash
@@ -53,10 +74,10 @@ docker compose run --rm cli demo heal-watch
 docker compose down
 ```
 
-To remove persisted data:
+Data is persisted in `/var/lib/dfs/` on the host filesystem. To remove persisted data:
 
 ```bash
-docker compose down -v
+sudo rm -rf /var/lib/dfs/*
 ```
 
 ## Troubleshooting
