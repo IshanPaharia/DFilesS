@@ -70,6 +70,8 @@ export async function uploadFile(ctx: CliContext, filePath: string): Promise<Fil
     for (const attempt of attempts) {
       if (attempt.status === "fulfilled") {
         successfulReplicas.push(attempt.value);
+      } else {
+        ctx.log(`Target replica upload failed: ${attempt.reason instanceof Error ? attempt.reason.message : attempt.reason}`);
       }
     }
 

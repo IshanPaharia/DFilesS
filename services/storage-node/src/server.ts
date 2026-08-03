@@ -11,7 +11,7 @@ export interface StorageNodeConfig {
 }
 
 export function createStorageServer(config: StorageNodeConfig) {
-  const server = Fastify({ logger: true });
+  const server = Fastify({ logger: true, bodyLimit: 20 * 1024 * 1024 });
   const store = new ChunkStore(config.dataDir);
 
   server.register(cors, {
@@ -19,7 +19,7 @@ export function createStorageServer(config: StorageNodeConfig) {
     exposedHeaders: ["x-checksum", "content-type"]
   });
 
-  server.addContentTypeParser("application/octet-stream", { parseAs: "buffer" }, (_request, body, done) => {
+  server.addContentTypeParser("application/octet-stream", { parseAs: "buffer", bodyLimit: 20 * 1024 * 1024 }, (_request, body, done) => {
     done(null, body);
   });
 

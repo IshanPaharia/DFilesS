@@ -123,6 +123,7 @@ services:
       - cli
     environment:
       METADATA_URL: http://metadata-service:4000
+      DFS_WRITE_SECRET: ${DFS_WRITE_SECRET:-}
     entrypoint: ["pnpm", "--filter", "@dfs/cli", "start", "--"]
     depends_on:
       - metadata-service

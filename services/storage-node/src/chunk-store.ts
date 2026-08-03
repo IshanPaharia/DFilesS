@@ -16,6 +16,7 @@ export class ChunkStore {
     if (!verifySha256(bytes, expectedChecksum)) {
       throw new Error("checksum mismatch");
     }
+    await mkdir(this.rootDir, { recursive: true });
     await writeFile(this.pathFor(chunkId), bytes);
   }
 
