@@ -126,6 +126,16 @@ export function createMetadataServer(db: MetadataDb) {
     }
   });
 
+  server.delete<{ Params: { fileId: string } }>("/files/:fileId", async (request, reply) => {
+    await db.deleteFile(request.params.fileId);
+    return reply.status(204).send();
+  });
+
+  server.delete("/files", async (_request, reply) => {
+    const deletedCount = await db.deleteIncompleteFiles();
+    return reply.send({ message: `Deleted ${deletedCount} incomplete files` });
+  });
+
   server.post<{ Params: { id: string } }>("/chunk-locations/:id/report-bad", async (request, reply) => {
     await db.reportBadLocation(request.params.id);
     return reply.status(204).send();

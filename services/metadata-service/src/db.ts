@@ -243,6 +243,15 @@ export class MetadataDb {
     return mapFile(updated.rows[0]);
   }
 
+  async deleteFile(fileId: string): Promise<void> {
+    await this.pool.query("DELETE FROM files WHERE id = $1", [fileId]);
+  }
+
+  async deleteIncompleteFiles(): Promise<number> {
+    const result = await this.pool.query("DELETE FROM files WHERE status = 'uploading'");
+    return result.rowCount ?? 0;
+  }
+
   async getFile(fileId: string): Promise<FileRecord> {
     const result = await this.pool.query("SELECT * FROM files WHERE id = $1", [fileId]);
     if (result.rowCount === 0) {

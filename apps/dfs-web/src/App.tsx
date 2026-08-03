@@ -33,7 +33,7 @@ export function App() {
 
           <div className="flex items-center gap-2">
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-[#DCFCE7] text-[#15803D]">
-              <span className="w-2 h-2 rounded-full bg-[#15803D]" /> RF=3 Active
+              <span className="w-2 h-2 rounded-full bg-[#15803D]" /> Active
             </span>
           </div>
         </div>
