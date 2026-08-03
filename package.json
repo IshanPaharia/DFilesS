@@ -9,7 +9,8 @@
     "typecheck": "corepack pnpm --filter @dfs/shared build && corepack pnpm -r typecheck",
     "dev:metadata": "corepack pnpm --filter @dfs/metadata-service dev",
     "dev:storage": "corepack pnpm --filter @dfs/storage-node dev",
-    "dev:cli": "corepack pnpm --filter @dfs/cli dev"
+    "dev:cli": "corepack pnpm --filter @dfs/cli dev",
+    "dev:web": "corepack pnpm --filter @dfs/web dev"
   },
   "devDependencies": {
     "@types/node": "^22.13.5",

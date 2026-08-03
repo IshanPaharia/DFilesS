@@ -36,3 +36,19 @@ Every deviation from the PRD or implementation plan must be recorded here with d
 - Decision: Use `docker kill storage-node-3` as the default failure demo and document `docker compose stop storage-node-3` as the graceful variant.
 - Rationale: `docker kill` better demonstrates crash tolerance.
 - Impact: The main demo proves failover after an ungraceful node death.
+
+## 2026-08-03: DFilesS Web Dashboard (`apps/dfs-web`)
+
+- Context: The system needed a presentation layer for non-technical viewers to demo upload, download, file listing, and self-healing cluster state.
+- Decision: Add `apps/dfs-web` as a React + Vite + Tailwind dashboard, enable CORS on `metadata-service` and `storage-node`, add `GET /files`, and implement VPS gateway chunk proxying (`/gateway/nodes/:nodeId/chunks/:chunkId`).
+- Rationale: Allows browser clients to upload and download files through a single public origin without direct browser access to private Docker storage-node IPs.
+- Impact: The presentation polish is complete without introducing new distributed-systems logic.
+
+## 2026-08-03: Local/Colocated PostgreSQL
+
+- Context: Database setup choice between external managed Postgres (e.g. Neon) vs containerized local Postgres.
+- Decision: Kept Postgres local/colocated rather than Neon.
+- Rationale: Avoids adding an external network dependency to the control-plane's hot path.
+- Impact: Metadata operations retain low latency and zero external dependency risk during local and VPS deployment.
+
+

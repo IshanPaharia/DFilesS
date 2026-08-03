@@ -1,4 +1,5 @@
 import Fastify from "fastify";
+import cors from "@fastify/cors";
 import { getBytes, postJson, readEnv, readIntEnv, sha256, type StorageMetrics } from "@dfs/shared";
 import { ChunkStore } from "./chunk-store.js";
 
@@ -12,6 +13,11 @@ export interface StorageNodeConfig {
 export function createStorageServer(config: StorageNodeConfig) {
   const server = Fastify({ logger: true });
   const store = new ChunkStore(config.dataDir);
+
+  server.register(cors, {
+    origin: true,
+    exposedHeaders: ["x-checksum", "content-type"]
+  });
 
   server.addContentTypeParser("application/octet-stream", { parseAs: "buffer" }, (_request, body, done) => {
     done(null, body);

@@ -1,5 +1,6 @@
 import Fastify from "fastify";
-import { readEnv, readIntEnv } from "@dfs/shared";
+import cors from "@fastify/cors";
+import { getBytes, putBytes, readEnv, readIntEnv } from "@dfs/shared";
 import { MetadataDb } from "./db.js";
 
 export interface MetadataConfig {
@@ -11,6 +12,15 @@ export interface MetadataConfig {
 export function createMetadataServer(db: MetadataDb) {
   const server = Fastify({ logger: true });
 
+  server.register(cors, {
+    origin: true,
+    exposedHeaders: ["x-checksum", "content-type"]
+  });
+
+  server.addContentTypeParser("application/octet-stream", { parseAs: "buffer" }, (_request, body, done) => {
+    done(null, body);
+  });
+
   server.post<{ Body: { id: string; address: string } }>("/nodes/register", async (request, reply) => {
     const { id, address } = request.body;
     if (!id || !address) {
@@ -21,6 +31,10 @@ export function createMetadataServer(db: MetadataDb) {
 
   server.get("/nodes", async () => ({
     nodes: await db.listNodes()
+  }));
+
+  server.get("/files", async () => ({
+    files: await db.listFiles()
   }));
 
   server.post<{ Body: { name: string; size: number; chunkCount: number } }>("/files", async (request, reply) => {
@@ -75,6 +89,61 @@ export function createMetadataServer(db: MetadataDb) {
   });
 
   server.get("/metrics", async () => db.metrics());
+
+  server.put<{ Params: { nodeId: string; chunkId: string }; Body: Buffer }>(
+    "/gateway/nodes/:nodeId/chunks/:chunkId",
+    async (request, reply) => {
+      const { nodeId, chunkId } = request.params;
+      const checksum = request.headers["x-checksum"];
+      if (typeof checksum !== "string") {
+        return reply.status(400).send({ error: "missing x-checksum header" });
+      }
+
+      const nodes = await db.listNodes();
+      const targetNode = nodes.find((n) => n.id === nodeId);
+      if (!targetNode) {
+        return reply.status(404).send({ error: `node ${nodeId} not found` });
+      }
+
+      try {
+        await putBytes(targetNode.address, `/chunks/${chunkId}`, request.body, {
+          "content-type": "application/octet-stream",
+          "x-checksum": checksum
+        });
+        return reply.status(201).send({ status: "ok" });
+      } catch (err) {
+        return reply.status(502).send({ error: err instanceof Error ? err.message : "proxy upload failed" });
+      }
+    }
+  );
+
+  server.get<{ Params: { nodeId: string; chunkId: string } }>(
+    "/gateway/nodes/:nodeId/chunks/:chunkId",
+    async (request, reply) => {
+      const { nodeId, chunkId } = request.params;
+      const nodes = await db.listNodes();
+      const targetNode = nodes.find((n) => n.id === nodeId);
+      if (!targetNode) {
+        return reply.status(404).send({ error: `node ${nodeId} not found` });
+      }
+
+      try {
+        const response = await fetch(`${targetNode.address.replace(/\/$/, "")}/chunks/${chunkId}`);
+        if (!response.ok) {
+          return reply.status(response.status).send({ error: "chunk not found on target node" });
+        }
+        const checksum = response.headers.get("x-checksum");
+        if (checksum) {
+          reply.header("x-checksum", checksum);
+        }
+        reply.header("content-type", "application/octet-stream");
+        const arrayBuffer = await response.arrayBuffer();
+        return reply.send(Buffer.from(arrayBuffer));
+      } catch (err) {
+        return reply.status(502).send({ error: err instanceof Error ? err.message : "proxy download failed" });
+      }
+    }
+  );
 
   return server;
 }

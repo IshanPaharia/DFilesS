@@ -165,6 +165,11 @@ export class MetadataDb {
     return mapFile(result.rows[0]);
   }
 
+  async listFiles(): Promise<FileRecord[]> {
+    const result = await this.pool.query("SELECT * FROM files ORDER BY created_at DESC");
+    return result.rows.map(mapFile);
+  }
+
   async planChunk(fileId: string, request: ChunkPlanRequest): Promise<ChunkPlanResponse> {
     const existing = await this.pool.query("SELECT * FROM chunks WHERE file_id = $1 AND chunk_index = $2", [
       fileId,
