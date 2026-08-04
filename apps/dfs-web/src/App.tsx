@@ -55,11 +55,6 @@ export function App() {
           {activeTab === "cluster" && <ClusterTab />}
         </div>
       </main>
-
-      {/* Footer */}
-      <footer className="border-t border-[#DAD7D0] bg-white py-4 text-center text-xs text-[#737373] mt-auto">
-        DFilesS Dashboard • React + TypeScript + Vite + Tailwind CSS
-      </footer>
     </div>
   );
 }

@@ -14,7 +14,7 @@ export interface TabsProps {
 
 export const Tabs: React.FC<TabsProps> = ({ tabs, activeTab, onChange }) => {
   return (
-    <div className="flex border-b border-[#DAD7D0] gap-2">
+    <div className="flex justify-center items-center gap-2 sm:gap-6">
       {tabs.map((tab) => {
         const isActive = activeTab === tab.id;
         return (
